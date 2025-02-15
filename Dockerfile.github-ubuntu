@@ -1,0 +1,43 @@
+FROM ubuntu:latest
+
+# Set environment variables
+ENV RUNNER_VERSION=2.322.0 \
+    RUNNER_HOME=/actions-runner \
+    RUNNER_USER="runner"
+
+# Update the OS base packages
+RUN apt-get update -y && apt-get upgrade -y
+
+# Install dependencies required by the runner and other tools
+RUN apt-get update && apt-get install -y \
+  curl \
+  jq \
+  git \
+  python3 \
+  python3-pip \
+  gnupg \
+  software-properties-common && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*  
+
+# Create runner user and directory structure
+RUN useradd -m -s /bin/bash ${RUNNER_USER} \
+    && mkdir -p /actions-runner ${RUNNER_TOOL_CACHE} \
+    && chown -R ${RUNNER_USER}:${RUNNER_USER} /actions-runner ${RUNNER_TOOL_CACHE}
+
+# Set working directory
+WORKDIR /actions-runner
+
+# Download, extract and install the GitHub Actions Runner
+RUN curl -o actions-runner.tar.gz -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz \
+    && tar xzf ./actions-runner.tar.gz \
+    && rm actions-runner.tar.gz
+
+# Add entrypoint script
+COPY github-actions-runner/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh && chown ${RUNNER_USER}:${RUNNER_USER} ./entrypoint.sh
+
+# Switch to runner user
+USER ${RUNNER_USER}
+
+ENTRYPOINT ["./entrypoint.sh"]
